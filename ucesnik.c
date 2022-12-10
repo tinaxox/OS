@@ -62,10 +62,28 @@ int main()
         msgsnd(id_reda, (void *)&p, sizeof(p) - sizeof(p.mtype), 0);
         ponuda max_runde;
         msgrcv(id_reda, (void *)&max_runde, sizeof(max_runde) - sizeof(max_runde.mtype), u.pid_ucesnika, 0);
+        if (max_runde.pid_ucesnika == p.pid_ucesnika)
+        {
+            printf("Ja sam pobednik runde %d sa iznosom %d\n", broj_kruga, max_runde.iznos);
+        }
+        else
+        {
+            printf("Pobednik nakon runde %d je korisnik %d sa iznosom %d\n", broj_kruga, max_runde.rbr, max_runde.iznos);
+        }
     }
     ponuda max;
 
     msgrcv(id_reda, (void *)&max, sizeof(max) - sizeof(max.mtype), u.pid_ucesnika, 0);
     printf("MAKSIMALNA PONUDA %d-%d %d\n", max.rbr, max.pid_ucesnika, max.iznos);
+
+    if (max.pid_ucesnika == u.pid_ucesnika)
+    {
+        printf("Ja sam pobednik runde %d sa iznosom %d\n", aukcija, max.iznos);
+    }
+    else
+    {
+        printf("Pobednik nakon runde %d je korisnik %d sa iznosom %d\n", aukcija, max.rbr, max.iznos);
+    }
+
     return 0;
 }

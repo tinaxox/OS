@@ -24,15 +24,36 @@ typedef struct ponuda
     pid_t pid_ucesnika;
 
 } ponuda;
+int semafor = 1;
+int N, M;
+pid_t aukcije[100];
+int qid_rezultati;
+int id_reda;
+void handler(int sig)
+{
+    semafor = 0;
+    for (int i = 0; i < N; i++)
+    {
+        ponuda max_aukcija;
+
+        waitpid(aukcije[i], NULL, 0);
+        msgrcv(qid_rezultati, (void *)&max_aukcija, sizeof(max_aukcija) - sizeof(max_aukcija.mtype), 1, 0);
+        printf("\nKnjiga je prodata ucesniku %d za %d dinara.\n", max_aukcija.rbr, max_aukcija.iznos);
+    }
+
+    printf("Sve planirane aukcije su zavrsene.\n");
+    // msgctl(id_reda, IPC_RMID, NULL);
+    // msgctl(qid_rezultati, IPC_RMID, NULL);
+}
 
 int main()
 {
     // prijave
-    int N, M; // N-broj knjiga (aukcija), M-broj ucesnika na aukciji
     scanf("%d%d", &N, &M);
     printf("%d %d\n", N, M);
+
     key_t key = ftok("./organizator.c", 1);
-    int id_reda = msgget(key, IPC_CREAT | 0666);
+    id_reda = msgget(key, IPC_CREAT | 0666);
     ucesnik ucesnici[N * M];
     for (int i = 0; i < N * M; i++)
     {
@@ -52,12 +73,14 @@ int main()
     printf("--------------------\n");
     printf("Prijavili su se svi.\n");
 
+    key_t key_rezultati = ftok("./organizator.c", 0);
+    qid_rezultati = msgget(key_rezultati, IPC_CREAT | 0666);
     // aukcije
     for (int i = 0; i < N; i++)
     {
         ponuda ponude[M];
         pid_t aukcija = fork();
-
+        aukcije[i] = aukcija;
         if (aukcija == -1)
         {
             printf("ERROR\n");
@@ -65,6 +88,8 @@ int main()
         }
         if (aukcija == 0)
         {
+            signal(SIGINT, SIG_IGN);
+
             ucesnik ucesnik_na_aukciji[M];
             for (int j = 0; j < M; j++)
             {
@@ -106,9 +131,15 @@ int main()
                 }
                 if (broj_kruga == 0 || max_runde.iznos > max_aukcije.iznos)
                 {
+
                     max_aukcije = max_runde;
                 }
             }
+
+            max_aukcije.mtype = 1;
+            msgsnd(qid_rezultati, (void *)&max_aukcije, sizeof(max_aukcije) - sizeof(max_aukcije.mtype), 0);
+            printf("max aukcije handler%d-%d\n", max_aukcije.rbr, max_aukcije.iznos);
+
             for (int j = 0; j < M; j++)
             {
                 max_aukcije.mtype = ucesnik_na_aukciji[j].pid_ucesnika;
@@ -117,11 +148,13 @@ int main()
 
             exit(0);
         }
+        else
+        {
+            signal(SIGINT, handler);
+        }
     }
-
-    for (int i = 0; i < N; i++)
+    while (semafor) // da ceka dok ne udje u dete, tj ceka da se deca zavrse i tek onda mi mozemo signal i tad se menja semafor
     {
-        wait(NULL);
     }
 
     return 0;
